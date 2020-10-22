@@ -1,0 +1,74 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: yes
+ 
+
+
+  vars_files:
+    - /etc/ansible/playlists/postgres/postgres_vars.yaml
+
+  tasks:
+    
+ 
+  - name: Start Postgresql
+    systemd:
+      state: restarted
+      name: postgresql-10
+    when: inventory_hostname == '{{ primarydb }}'
+
+
+  - name: Register Primary Node
+    become_user: postgres
+    shell: |
+      /usr/pgsql-10/bin/repmgr -f /etc/repmgr/10/repmgr.conf primary register
+    when: inventory_hostname == '{{ primarydb }}'
+    
+  - name: Clone Primary to Standby
+    become_user: postgres
+    shell: |
+      /usr/pgsql-10/bin/repmgr -h {{ primarydb }} -U repmgr -d repmgr -f /etc/repmgr/10/repmgr.conf standby clone
+    when: inventory_hostname == '{{ standbydb }}'
+    ignore_errors: yes
+
+
+  - name: Start Postgresql
+    systemd:
+      state: started
+      name: postgresql-10
+    when: inventory_hostname == '{{ standbydb }}'
+
+  - name: Register Standby Node
+    become_user: postgres
+    shell: |
+      /usr/pgsql-10/bin/repmgr -f /etc/repmgr/10/repmgr.conf standby register -F
+    when: inventory_hostname == '{{ primarydb }}'
+
+
+
+## Applied password set it Vars_prompt to postgresql DB
+
+    #  - name: Set Postgres DB Password 
+    #shell: echo "ALTER USER postgres WITH PASSWORD '"{{ psqlpw }}"';" | sudo -u postgres psql
+
+## Create repmgr user and db
+
+    #- name: Create repmgr user and db
+    #become_user: postgres
+    #shell: | 
+    #  createuser -s repmgr
+    #  createdb repmgr -O repmgr
+
+      
+## Post config service restart
+
+  - name: Post-config Postgresql Restart
+    systemd:
+      state: restarted
+      name: postgresql-10
+
+  - name: Start repmgr service
+    systemd:
+      state: started
+      name: repmgr10
+

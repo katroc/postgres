@@ -1,0 +1,4 @@
+---
+- import_playbook: base_postgres.yaml
+- import_playbook: config_primary.yaml
+- import_playbook: register_and_clone.yaml

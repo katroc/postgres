@@ -1,0 +1,93 @@
+---
+- hosts: postgres_primary
+  become: yes
+  gather_facts: yes
+ 
+
+
+  vars_files:
+    - /etc/ansible/playlists/postgres/postgres_vars.yaml
+
+  tasks:
+    
+## Runs postgresql initdb modifies postresql.conf  
+
+  - name: Initiate Postgresql DB
+    shell: /usr/pgsql-10/bin/postgresql-10-setup initdb
+    ignore_errors: yes
+ 
+  - name: Start Postgresql
+    systemd:
+      state: started
+      name: postgresql-10
+      enabled: yes
+
+      #  - name: Set Listen Addresses
+      #    lineinfile:
+      #      path: /var/lib/pgsql/10/data/postgresql.conf
+      #      regexp: "^#listen_addresses = 'localhost'"
+      #      line: listen_addresses = '*'
+
+
+  - name: Add replication inclusion to postgresql.conf
+    lineinfile:
+      path: /var/lib/pgsql/10/data/postgresql.conf
+      line: |
+       include 'postgresql.replication.conf'
+
+    
+
+
+  - name: Create postgresql.conf
+    copy:
+      dest: /var/lib/pgsql/10/data/postgresql.replication.conf
+      content: |
+        listen_addresses = '*'
+        max_wal_senders = 10
+        max_replication_slots = 10
+        wal_level = 'hot_standby'
+        hot_standby = on
+        archive_mode = on
+        archive_command = '/bin/true'
+        shared_preload_libraries = 'repmgr'
+
+
+
+  - name: Post-config Postgresql Restart
+    systemd:
+      state: restarted
+      name: postgresql-10
+
+## Applied password set it Vars_prompt to postgresql DB
+
+  - name: Set Postgres DB Password 
+    shell: echo "ALTER USER postgres WITH PASSWORD '"{{ psqlpw }}"';" | sudo -u postgres psql
+
+## Create repmgr user and db
+
+  - name: Create repmgr user and db
+    become_user: postgres
+    shell: | 
+      createuser -s repmgr
+      createdb repmgr -O repmgr
+    ignore_errors: yes
+## Amend pg_hba.conf
+
+  - name: Amend pg_hba
+    lineinfile:
+      path: /var/lib/pgsql/10/data/pg_hba.conf
+      line: |
+       local   replication   repmgr                              trust
+       host    replication   repmgr      127.0.0.1/32            trust
+       host    replication   repmgr      192.168.20.0/24          trust
+       local   repmgr        repmgr                              trust
+       host    repmgr        repmgr      127.0.0.1/32            trust
+       host    repmgr        repmgr      192.168.20.0/24          trust       
+
+## Post config service restart
+
+  - name: Post-config Postgresql Restart
+    systemd:
+      state: restarted
+      name: postgresql-10
+

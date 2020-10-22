@@ -1,0 +1,5 @@
+---
+
+primarydb: 192.168.20.26
+standbydb: 192.168.20.27
+psqlpw: define password here
