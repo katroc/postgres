@@ -1,0 +1,11 @@
+---
+  - hosts: all
+    become: yes
+    gather_facts: no
+    tasks:
+      - name: Create User
+        user:
+          name: ansible
+          comment: ansible user
+          group: wheel
+          password: insert hashed pw here
