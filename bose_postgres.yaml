@@ -1,0 +1,81 @@
+---
+- hosts: all
+  become: yes
+  gather_facts: yes
+ 
+
+
+  vars_files:
+    - /etc/ansible/playlists/postgres/postgres_vars.yaml
+
+  tasks:
+    
+## get_url is used similar to WGET - downloads the repo from Postgres    
+
+  - name: Get Postgresql-10 RPM
+    get_url:
+     url: https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm 
+     dest: /tmp/
+     mode: '0440'
+          
+## Installs postgresql rpm, required Postgresql dependencies, and repmgr 
+
+  - name: Install Postgresql-10 RPM
+    yum:
+      name: /tmp/pgdg-redhat-repo-latest.noarch.rpm
+      state: present
+ 
+  - name: Install Dependencies
+    yum:
+     name: ['postgresql10','postgresql10-server','postgresql10-contrib','repmgr10']
+
+  - name: Permit Postgres Traffic
+    firewalld:
+      service: postgresql
+      permanent: yes
+      state: enabled
+
+  - name: restart firewalld to apply changes
+    systemd:
+      state: restarted
+      name: firewalld
+
+  - name: Create repmgr PID dir
+    file:
+      path: /run/repmgr/
+      state: directory
+      mode: 0755
+      owner: postgres
+      group: postgres
+
+  - name: create repmgr ENV
+    copy:
+      dest: /etc/profile.d/env.sh
+      content: |
+        export PATH=/usr/pgsql-10/bin:$PATH
+
+## Create Primary repmgr config
+
+  - name: Generate repmgr config
+    copy:
+      dest: /etc/repmgr/10/repmgr.conf
+      content: |
+        node_id=1
+        node_name= '{{ inventory_hostname }}'
+        conninfo='host={{ inventory_hostname }} user=repmgr dbname=repmgr connect_timeout=2'
+        data_directory='/var/lib/pgsql/10/data/'
+        pg_bindir='/usr/pgsql-10/bin/'
+    when: inventory_hostname == '{{ primarydb }}'        
+
+## Create Standby repmgr config
+
+  - name: Generate repmgr config
+    copy:
+      dest: /etc/repmgr/10/repmgr.conf
+      content: |
+        node_id=2
+        node_name= '{{ inventory_hostname }}'
+        conninfo='host={{ inventory_hostname }} user=repmgr dbname=repmgr connect_timeout=2'
+        data_directory='/var/lib/pgsql/10/data/'
+        pg_bindir='/usr/pgsql-10/bin/'
+    when: inventory_hostname == '{{ standbydb }}'
