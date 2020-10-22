@@ -1,0 +1,13 @@
+---
+- hosts: all
+  vars:
+    user: "{{ lookup('env','USER') }}"
+  remote_user: "{{ user }}"
+  tasks:
+    - debug:
+        msg: "{{ user }}"
+    - authorized_key:
+                user: "{{ user }}"
+                state: present
+                manage_dir: yes
+                key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
