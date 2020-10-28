@@ -1,0 +1,21 @@
+#!/bin/bash
+HOST="localhost"
+PORT="5432"
+DB="postgres"
+USER="postgres"
+PGSTATUS() {
+ psql -h $HOST -U $USER  -p $PORT -c "select pg_is_in_recovery()" -x
+}
+if PGSTATUS | grep "pg_is_in_recovery | t"
+then
+/bin/echo -e "HTTP/1.1 206 OK\r\n"
+/bin/echo -e "Content-Type: Content-Type: text/plain\r\n"
+/bin/echo -e "\r\n"
+/bin/echo "Standby"
+/bin/echo -e "\r\n"
+else
+/bin/echo -e "HTTP/1.1 200 OK\r\n"
+/bin/echo -e "Content-Type: Content-Type: text/plain\r\n"
+/bin/echo -e "\r\n"
+/bin/echo "Primary"
+/bin/echo -e "\r\n"
